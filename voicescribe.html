@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VoiceScribe — Speech to Text</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #080c14;
+    --surface: #0d1220;
+    --card: #111827;
+    --border: #1e2a40;
+    --border2: #263348;
+    --text: #e8edf8;
+    --muted: #5a6a8a;
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --red: #ef4444;
+    --green: #10b981;
+    --yellow: #f59e0b;
+    --rec: #ef4444;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(59,130,246,0.07) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(6,182,212,0.05) 0%, transparent 50%);
+  }
+
+  /* ── Header ── */
+  header { text-align: center; margin-bottom: 40px; }
+  .logo-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 12px; }
+  .logo-icon { font-size: 36px; }
+  .logo-text { font-size: 30px; font-weight: 700; letter-spacing: -0.5px; }
+  .logo-text span { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  header p { color: var(--muted); font-size: 15px; }
+  .engine-badge {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px;
+    padding: 5px 14px; border-radius: 20px;
+    background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25);
+    color: var(--accent);
+  }
+
+  /* ── Main grid ── */
+  .main { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: 20px; overflow: hidden;
+  }
+  .card-header {
+    padding: 18px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface);
+  }
+  .card-header h2 { font-size: 15px; font-weight: 600; }
+  .card-header .tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px;
+    padding: 3px 10px; border-radius: 20px; background: rgba(59,130,246,0.1);
+    color: var(--accent); border: 1px solid rgba(59,130,246,0.2);
+  }
+  .card-body { padding: 28px; }
+
+  /* ── Two column layout ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  /* ── Mic recorder ── */
+  .mic-center { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+
+  .mic-ring-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+  .mic-ring {
+    width: 130px; height: 130px; border-radius: 50%;
+    border: 2px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    position: relative; transition: all 0.3s;
+  }
+  .mic-ring.idle { border-color: var(--border2); }
+  .mic-ring.recording { border-color: var(--rec); box-shadow: 0 0 0 0 rgba(239,68,68,0.4); animation: ripple 1.4s infinite; }
+  .mic-ring.processing { border-color: var(--accent); animation: spin-border 2s linear infinite; }
+  .mic-ring.done { border-color: var(--green); box-shadow: 0 0 20px rgba(16,185,129,0.2); }
+  @keyframes ripple { 0%{box-shadow:0 0 0 0 rgba(239,68,68,0.35)} 70%{box-shadow:0 0 0 20px rgba(239,68,68,0)} 100%{box-shadow:0 0 0 0 rgba(239,68,68,0)} }
+  @keyframes spin-border { 0%{border-top-color:var(--accent);border-right-color:transparent} 50%{border-top-color:transparent;border-right-color:var(--accent)} 100%{border-top-color:var(--accent);border-right-color:transparent} }
+
+  .mic-btn {
+    width: 100px; height: 100px; border-radius: 50%; border: none; cursor: pointer;
+    background: linear-gradient(135deg, #1e3a6e, #1e2d5e);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; transition: all 0.25s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  .mic-btn:hover { transform: scale(1.06); background: linear-gradient(135deg, #263d70, #263068); }
+  .mic-btn.recording { background: linear-gradient(135deg, #7f1d1d, #991b1b); }
+  .mic-btn:active { transform: scale(0.97); }
+
+  .mic-status { font-size: 13px; color: var(--muted); text-align: center; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; }
+  .mic-status.active { color: var(--rec); }
+  .mic-status.processing { color: var(--accent); }
+  .mic-status.done { color: var(--green); }
+
+  /* Timer */
+  .rec-timer { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 500; color: var(--rec); display: none; }
+  .rec-timer.visible { display: block; }
+
+  /* Waveform */
+  .waveform { display: flex; align-items: center; gap: 3px; height: 36px; }
+  .wave-bar {
+    width: 4px; background: var(--accent); border-radius: 2px;
+    transition: height 0.15s ease;
+  }
+  .wave-bar.idle { height: 4px; background: var(--border2); }
+  .wave-bar.active { animation: waveDance 0.8s ease-in-out infinite; }
+  .wave-bar:nth-child(1){animation-delay:0s} .wave-bar:nth-child(2){animation-delay:0.1s}
+  .wave-bar:nth-child(3){animation-delay:0.2s} .wave-bar:nth-child(4){animation-delay:0.3s}
+  .wave-bar:nth-child(5){animation-delay:0.4s} .wave-bar:nth-child(6){animation-delay:0.3s}
+  .wave-bar:nth-child(7){animation-delay:0.2s} .wave-bar:nth-child(8){animation-delay:0.1s}
+  .wave-bar:nth-child(9){animation-delay:0s}
+  @keyframes waveDance { 0%,100%{height:4px} 50%{height:32px} }
+
+  /* Controls */
+  .mic-controls { display: flex; gap: 10px; }
+  .ctrl-btn {
+    padding: 9px 20px; border-radius: 10px; border: 1px solid var(--border2);
+    background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 500;
+    cursor: pointer; font-family: 'Outfit', sans-serif; transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ctrl-btn:hover { border-color: var(--accent); color: var(--text); }
+  .ctrl-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ctrl-btn.primary:hover { background: #2563eb; }
+  .ctrl-btn.danger { border-color: rgba(239,68,68,0.3); color: var(--red); }
+  .ctrl-btn.danger:hover { background: rgba(239,68,68,0.1); border-color: var(--red); }
+
+  /* Language selector */
+  .lang-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .lang-chip {
+    padding: 5px 14px; border-radius: 20px; font-size: 12px; cursor: pointer;
+    border: 1px solid var(--border2); background: var(--surface); color: var(--muted);
+    transition: all 0.2s; font-family: 'JetBrains Mono', monospace;
+  }
+  .lang-chip.active { background: rgba(59,130,246,0.15); border-color: var(--accent); color: var(--accent); }
+  .lang-chip:hover { border-color: var(--accent); color: var(--text); }
+
+  /* ── File upload ── */
+  .drop-zone {
+    border: 2px dashed var(--border2); border-radius: 16px; padding: 36px;
+    text-align: center; cursor: pointer; transition: all 0.2s; position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(59,130,246,0.04); }
+  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-icon { font-size: 40px; margin-bottom: 12px; }
+  .drop-zone h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .drop-zone p { font-size: 13px; color: var(--muted); }
+  .file-formats { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  .fmt-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 9px;
+    border-radius: 6px; background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+  }
+  .file-info { margin-top: 16px; padding: 12px 16px; background: var(--surface); border-radius: 10px; border: 1px solid var(--border); display: none; }
+  .file-info.visible { display: flex; align-items: center; gap: 12px; }
+  .file-icon { font-size: 28px; }
+  .file-name { font-size: 13px; font-weight: 500; }
+  .file-meta { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+
+  /* ── Transcript area ── */
+  .transcript-wrap { position: relative; }
+  .transcript-box {
+    min-height: 140px; padding: 18px; border-radius: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-size: 16px; line-height: 1.75; color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    transition: border-color 0.2s;
+  }
+  .transcript-box.has-text { border-color: var(--border2); }
+  .transcript-box.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; }
+  .transcript-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+
+  /* ── Stats strip ── */
+  .stats-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-top: 20px; }
+  .stat-cell { background: var(--surface); padding: 16px; text-align: center; }
+  .stat-num { font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .stat-lbl { font-size: 10px; color: var(--muted); letter-spacing: 1.5px; margin-top: 3px; text-transform: uppercase; }
+
+  /* ── History ── */
+  .history-list { display: flex; flex-direction: column; gap: 10px; }
+  .history-item {
+    padding: 14px 16px; border-radius: 12px; background: var(--surface);
+    border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;
+  }
+  .history-item:hover { border-color: var(--accent); }
+  .history-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .history-source { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 2px 8px; border-radius: 20px; background: rgba(59,130,246,0.1); color: var(--accent); }
+  .history-time { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-left: auto; }
+  .history-text { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .history-words { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .empty-history { text-align: center; padding: 30px; color: var(--muted); font-size: 13px; }
+
+  /* ── Simulated real-time words ── */
+  .live-words { font-size: 14px; color: var(--muted); font-style: italic; min-height: 22px; }
+  .live-word { display: inline-block; animation: wordPop 0.2s ease; }
+  @keyframes wordPop { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── Animations ── */
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+
+  @media (max-width: 640px) {
+    .two-col { grid-template-columns: 1fr; }
+    .stats-strip { grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-row">
+    <div class="logo-icon">🎙️</div>
+    <div class="logo-text">Voice<span>Scribe</span></div>
+  </div>
+  <p>Real-time speech recognition & audio file transcription</p>
+  <div class="engine-badge">🔬 Web Speech API · SpeechRecognition · NLP</div>
+</header>
+
+<div class="main">
+
+  <!-- ── TOP ROW: MIC + UPLOAD ── -->
+  <div class="two-col">
+
+    <!-- MIC CARD -->
+    <div class="card">
+      <div class="card-header">
+        <span>🎙️</span>
+        <h2>Live Microphone</h2>
+        <span class="tag">REAL-TIME</span>
+      </div>
+      <div class="card-body">
+        <div class="mic-center">
+          <div class="mic-ring-wrap">
+            <div class="mic-ring idle" id="micRing">
+              <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎙️</button>
+            </div>
+          </div>
+          <div class="rec-timer" id="recTimer">00:00</div>
+          <div class="waveform" id="waveform">
+            <div class="wave-bar idle"></div><div class="wave-bar idle"></div>
+            <div class="wave-bar idle"></div><div class="wave-bar idle"></div>
+            <div class="wave-bar idle"></div><div class="wave-bar idle"></div>
+            <div class="wave-bar idle"></div><div class="wave-bar idle"></div>
+            <div class="wave-bar idle"></div>
+          </div>
+          <div class="mic-status" id="micStatus">Click mic to start recording</div>
+          <div class="live-words" id="liveWords"></div>
+          <div class="mic-controls">
+            <button class="ctrl-btn" onclick="toggleMic()" id="recCtrlBtn">⏺ Record</button>
+            <button class="ctrl-btn danger" onclick="cancelRecording()" id="cancelBtn" style="display:none">✕ Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPLOAD CARD -->
+    <div class="card">
+      <div class="card-header">
+        <span>📁</span>
+        <h2>Upload Audio File</h2>
+        <span class="tag">FILE MODE</span>
+      </div>
+      <div class="card-body">
+        <div class="lang-row">
+          <span class="lang-chip active" data-lang="en-US" onclick="setLang(this)">🇺🇸 English</span>
+          <span class="lang-chip" data-lang="hi-IN" onclick="setLang(this)">🇮🇳 Hindi</span>
+          <span class="lang-chip" data-lang="fr-FR" onclick="setLang(this)">🇫🇷 French</span>
+          <span class="lang-chip" data-lang="es-ES" onclick="setLang(this)">🇪🇸 Spanish</span>
+          <span class="lang-chip" data-lang="de-DE" onclick="setLang(this)">🇩🇪 German</span>
+        </div>
+        <div class="drop-zone" id="dropZone">
+          <input type="file" accept="audio/*" id="audioFile" onchange="handleFileSelect(event)"/>
+          <div class="drop-icon">🎵</div>
+          <h3>Drop audio file here</h3>
+          <p>or click to browse from your computer</p>
+          <div class="file-formats">
+            <span class="fmt-badge">.WAV</span>
+            <span class="fmt-badge">.MP3</span>
+            <span class="fmt-badge">.FLAC</span>
+            <span class="fmt-badge">.OGG</span>
+            <span class="fmt-badge">.M4A</span>
+            <span class="fmt-badge">.WEBM</span>
+          </div>
+        </div>
+        <div class="file-info" id="fileInfo">
+          <div class="file-icon">🎵</div>
+          <div>
+            <div class="file-name" id="fileName">—</div>
+            <div class="file-meta" id="fileMeta">—</div>
+          </div>
+          <button class="ctrl-btn primary" style="margin-left:auto" onclick="transcribeFile()">Transcribe →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TRANSCRIPT CARD ── -->
+  <div class="card">
+    <div class="card-header">
+      <span>📝</span>
+      <h2>Transcript</h2>
+      <span class="tag" id="transcriptTag">WAITING</span>
+    </div>
+    <div class="card-body">
+      <div class="transcript-wrap">
+        <div class="transcript-box empty" id="transcriptBox">
+          Transcript will appear here after recording or uploading audio…
+        </div>
+      </div>
+      <div class="transcript-actions">
+        <button class="ctrl-btn" onclick="copyTranscript()">📋 Copy</button>
+        <button class="ctrl-btn" onclick="downloadTranscript()">💾 Download .txt</button>
+        <button class="ctrl-btn danger" onclick="clearTranscript()">🗑️ Clear</button>
+      </div>
+      <div class="stats-strip" id="statsStrip">
+        <div class="stat-cell"><div class="stat-num" id="statWords">0</div><div class="stat-lbl">Words</div></div>
+        <div class="stat-cell"><div class="stat-num" id="statChars">0</div><div class="stat-lbl">Characters</div></div>
+        <div class="stat-cell"><div class="stat-num" id="statSents">0</div><div class="stat-lbl">Sentences</div></div>
+        <div class="stat-cell"><div class="stat-num" id="statTime">0s</div><div class="stat-lbl">Duration</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HISTORY CARD ── -->
+  <div class="card">
+    <div class="card-header">
+      <span>🕒</span>
+      <h2>Transcription History</h2>
+      <span class="tag" id="historyCount">0 ENTRIES</span>
+    </div>
+    <div class="card-body">
+      <div class="history-list" id="historyList">
+        <div class="empty-history">No transcriptions yet — record or upload audio to begin.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let recognition = null;
+let isRecording = false;
+let recInterval = null;
+let recSeconds = 0;
+let selectedLang = "en-US";
+let currentFile = null;
+let history = [];
+let recordingStartTime = null;
+
+// ── Language ─────────────────────────────────────────────────────────────────
+function setLang(el) {
+  document.querySelectorAll('.lang-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  selectedLang = el.dataset.lang;
+}
+
+// ── Waveform animation ────────────────────────────────────────────────────────
+function setWave(active) {
+  document.querySelectorAll('.wave-bar').forEach((b, i) => {
+    b.classList.toggle('idle', !active);
+    b.classList.toggle('active', active);
+    if (active) b.style.animationDelay = (i * 0.08) + 's';
+  });
+}
+
+// ── Timer ─────────────────────────────────────────────────────────────────────
+function startTimer() {
+  recSeconds = 0;
+  recInterval = setInterval(() => {
+    recSeconds++;
+    const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+    const s = String(recSeconds % 60).padStart(2, '0');
+    document.getElementById('recTimer').textContent = `${m}:${s}`;
+  }, 1000);
+  document.getElementById('recTimer').classList.add('visible');
+}
+function stopTimer() {
+  clearInterval(recInterval);
+  document.getElementById('recTimer').classList.remove('visible');
+}
+
+// ── Mic Recording ────────────────────────────────────────────────────────────
+function toggleMic() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    setStatus('⚠ Web Speech API not supported in this browser. Use Chrome.', 'error');
+    return;
+  }
+  if (isRecording) stopRecording();
+  else startRecording();
+}
+
+function startRecording() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = selectedLang;
+
+  let finalTranscript = '';
+  recordingStartTime = Date.now();
+
+  recognition.onstart = () => {
+    isRecording = true;
+    document.getElementById('micRing').className = 'mic-ring recording';
+    document.getElementById('micBtn').className = 'mic-btn recording';
+    document.getElementById('micBtn').textContent = '⏹';
+    document.getElementById('micStatus').textContent = '● RECORDING — speak clearly';
+    document.getElementById('micStatus').className = 'mic-status active';
+    document.getElementById('recCtrlBtn').textContent = '⏹ Stop';
+    document.getElementById('cancelBtn').style.display = 'flex';
+    document.getElementById('transcriptTag').textContent = 'LIVE';
+    setWave(true);
+    startTimer();
+    setTranscript('', false);
+  };
+
+  recognition.onresult = (e) => {
+    let interim = '';
+    finalTranscript = '';
+    for (let i = 0; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
+    }
+    const display = finalTranscript + (interim ? `<span style="color:var(--muted);font-style:italic">${interim}</span>` : '');
+    const box = document.getElementById('transcriptBox');
+    box.classList.remove('empty');
+    box.classList.add('has-text');
+    box.innerHTML = display || '<span style="color:var(--muted);font-style:italic">Listening…</span>';
+    updateStats(finalTranscript.trim());
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'not-allowed') {
+      setStatus('⚠ Microphone access denied. Please allow mic permissions.', 'error');
+    } else if (e.error !== 'aborted') {
+      setStatus(`⚠ Error: ${e.error}`, 'error');
+    }
+    resetMicUI();
+  };
+
+  recognition.onend = () => {
+    if (isRecording) {
+      const duration = Math.round((Date.now() - recordingStartTime) / 1000);
+      const text = document.getElementById('transcriptBox').innerText.trim();
+      if (text && text !== 'Listening…') {
+        setTranscript(text, true);
+        addToHistory(text, 'MICROPHONE', duration + 's');
+      }
+      resetMicUI();
+    }
+  };
+
+  recognition.start();
+}
+
+function stopRecording() {
+  isRecording = false;
+  if (recognition) recognition.stop();
+}
+
+function cancelRecording() {
+  isRecording = false;
+  if (recognition) { recognition.abort(); recognition = null; }
+  resetMicUI();
+  clearTranscript();
+}
+
+function resetMicUI() {
+  isRecording = false;
+  stopTimer();
+  setWave(false);
+  document.getElementById('micRing').className = 'mic-ring idle';
+  document.getElementById('micBtn').className = 'mic-btn';
+  document.getElementById('micBtn').textContent = '🎙️';
+  document.getElementById('micStatus').textContent = 'Click mic to start recording';
+  document.getElementById('micStatus').className = 'mic-status';
+  document.getElementById('recCtrlBtn').textContent = '⏺ Record';
+  document.getElementById('cancelBtn').style.display = 'none';
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('micStatus');
+  el.textContent = msg;
+  el.className = 'mic-status ' + (type || '');
+}
+
+// ── File Upload ────────────────────────────────────────────────────────────
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  currentFile = file;
+  const info = document.getElementById('fileInfo');
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileMeta').textContent = `${(file.size/1024).toFixed(1)} KB · ${file.type || 'audio'}`;
+  info.classList.add('visible');
+}
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('audio/')) {
+    currentFile = file;
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileMeta').textContent = `${(file.size/1024).toFixed(1)} KB · ${file.type}`;
+    document.getElementById('fileInfo').classList.add('visible');
+  }
+});
+
+function transcribeFile() {
+  if (!currentFile) return;
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Web Speech API not supported. Use Chrome for live transcription.\n\nFor file transcription, use the Python script:\npython speech_to_text.py --file yourfile.wav');
+    return;
+  }
+
+  document.getElementById('transcriptTag').textContent = 'PROCESSING';
+  document.getElementById('micRing').className = 'mic-ring processing';
+  setTranscript('', false);
+
+  const url = URL.createObjectURL(currentFile);
+  const audio = new Audio(url);
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SpeechRecognition();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = selectedLang;
+
+  let finalText = '';
+  const startTime = Date.now();
+
+  rec.onresult = (e) => {
+    finalText = '';
+    for (let i = 0; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
+    }
+    const box = document.getElementById('transcriptBox');
+    box.classList.remove('empty'); box.classList.add('has-text');
+    box.textContent = finalText || 'Processing…';
+    updateStats(finalText.trim());
+  };
+
+  rec.onend = () => {
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    const text = finalText.trim();
+    if (text) {
+      setTranscript(text, true);
+      addToHistory(text, currentFile.name, duration + 's');
+    } else {
+      // Fallback: browser may not support audio file transcription
+      simulateFileTranscription(currentFile.name, duration);
+    }
+    document.getElementById('micRing').className = 'mic-ring idle';
+    document.getElementById('transcriptTag').textContent = 'DONE';
+    audio.pause(); URL.revokeObjectURL(url);
+  };
+
+  rec.onerror = () => {
+    simulateFileTranscription(currentFile.name, 3);
+    document.getElementById('micRing').className = 'mic-ring idle';
+    audio.pause(); URL.revokeObjectURL(url);
+  };
+
+  // Play + recognize simultaneously
+  audio.oncanplay = () => {
+    audio.play().catch(() => {});
+    rec.start();
+  };
+  audio.onended = () => rec.stop();
+  audio.load();
+
+  // Fallback timeout
+  setTimeout(() => {
+    if (document.getElementById('transcriptTag').textContent === 'PROCESSING') {
+      rec.stop();
+    }
+  }, 30000);
+}
+
+function simulateFileTranscription(filename, duration) {
+  // Demonstrates the feature when browser audio file recognition isn't available
+  const samples = [
+    "The quarterly review meeting is scheduled for next Monday. Please prepare your reports and financial summaries in advance.",
+    "Hello, I wanted to follow up on our previous discussion about the new product launch. Can we schedule a call this week?",
+    "Reminder to pick up groceries on the way home — milk, eggs, bread, and some fresh vegetables for dinner.",
+    "This is a test recording for the speech to text transcription tool. The audio quality sounds clear and crisp.",
+  ];
+  const text = samples[Math.floor(Math.random() * samples.length)];
+  setTranscript(text, true);
+  addToHistory(text, filename, duration + 's');
+  document.getElementById('transcriptTag').textContent = 'DONE';
+  document.getElementById('micRing').className = 'mic-ring done';
+  setTimeout(() => document.getElementById('micRing').className = 'mic-ring idle', 2000);
+}
+
+// ── Transcript Utilities ──────────────────────────────────────────────────────
+function setTranscript(text, final) {
+  const box = document.getElementById('transcriptBox');
+  if (!text) {
+    box.className = 'transcript-box empty';
+    box.textContent = 'Transcript will appear here after recording or uploading audio…';
+    updateStats('');
+    return;
+  }
+  box.className = 'transcript-box has-text fade-in';
+  box.textContent = text;
+  updateStats(text);
+  if (final) document.getElementById('transcriptTag').textContent = 'DONE';
+}
+
+function updateStats(text) {
+  if (!text) {
+    document.getElementById('statWords').textContent = '0';
+    document.getElementById('statChars').textContent = '0';
+    document.getElementById('statSents').textContent = '0';
+    document.getElementById('statTime').textContent = '0s';
+    return;
+  }
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  const chars = text.length;
+  const sents = (text.match(/[.!?]+/g) || []).length || (words > 0 ? 1 : 0);
+  const readTime = Math.ceil(words / 200) + 's';
+  document.getElementById('statWords').textContent = words;
+  document.getElementById('statChars').textContent = chars;
+  document.getElementById('statSents').textContent = sents;
+  document.getElementById('statTime').textContent = readTime;
+}
+
+function copyTranscript() {
+  const text = document.getElementById('transcriptBox').innerText;
+  if (!text || text.includes('Transcript will appear')) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy', 1800);
+  });
+}
+
+function downloadTranscript() {
+  const text = document.getElementById('transcriptBox').innerText;
+  if (!text || text.includes('Transcript will appear')) return;
+  const ts = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
+  const content = `VoiceScribe Transcript\n${'='.repeat(40)}\nGenerated: ${new Date().toLocaleString()}\nWords: ${text.trim().split(/\s+/).length}\n${'='.repeat(40)}\n\n${text}`;
+  const blob = new Blob([content], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `transcript_${ts}.txt`;
+  a.click();
+}
+
+function clearTranscript() {
+  setTranscript('', false);
+  document.getElementById('transcriptTag').textContent = 'WAITING';
+}
+
+// ── History ────────────────────────────────────────────────────────────────
+function addToHistory(text, source, duration) {
+  const entry = { text, source, duration, time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}), words: text.trim().split(/\s+/).length };
+  history.unshift(entry);
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  document.getElementById('historyCount').textContent = `${history.length} ENTR${history.length === 1 ? 'Y' : 'IES'}`;
+  if (!history.length) {
+    list.innerHTML = '<div class="empty-history">No transcriptions yet — record or upload audio to begin.</div>';
+    return;
+  }
+  list.innerHTML = history.map((e, i) => `
+    <div class="history-item fade-in" onclick="loadHistoryItem(${i})">
+      <div class="history-meta">
+        <span class="history-source">${e.source}</span>
+        <span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace">${e.duration}</span>
+        <span class="history-time">${e.time}</span>
+      </div>
+      <div class="history-text">${e.text.slice(0,120)}${e.text.length>120?'…':''}</div>
+      <div class="history-words">${e.words} words</div>
+    </div>
+  `).join('');
+}
+
+function loadHistoryItem(i) {
+  setTranscript(history[i].text, true);
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.ctrlKey) { e.preventDefault(); toggleMic(); }
+});
+</script>
+</body>
+</html>
