@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ShopBot — Customer Service</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #f0f4ff;
+    --white: #ffffff;
+    --surface: #f8faff;
+    --border: #e2e8f8;
+    --accent: #4f6ef7;
+    --accent2: #7c3aed;
+    --accent-light: #eef1ff;
+    --text: #1a1f36;
+    --muted: #8892b0;
+    --bot-bubble: #ffffff;
+    --user-bubble: #4f6ef7;
+    --pos: #10b981;
+    --neg: #ef4444;
+    --warn: #f59e0b;
+    --shadow: 0 2px 16px rgba(79,110,247,0.10);
+    --shadow-lg: 0 8px 40px rgba(79,110,247,0.15);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-image:
+      radial-gradient(ellipse at 10% 10%, rgba(79,110,247,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 90% 90%, rgba(124,58,237,0.06) 0%, transparent 50%);
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 1000px;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    height: 620px;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: linear-gradient(160deg, #1e2a5e 0%, #2d1b69 100%);
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .sidebar::before {
+    content: '';
+    position: absolute;
+    width: 200px; height: 200px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 50%;
+    top: -60px; right: -60px;
+  }
+  .sidebar::after {
+    content: '';
+    position: absolute;
+    width: 150px; height: 150px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 50%;
+    bottom: -40px; left: -40px;
+  }
+
+  .bot-avatar {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: linear-gradient(135deg, #4f6ef7, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; box-shadow: 0 4px 20px rgba(79,110,247,0.4);
+  }
+  .bot-name { font-size: 18px; font-weight: 600; margin-top: 10px; }
+  .bot-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.2)} }
+
+  .sidebar-section { position: relative; z-index: 1; }
+  .sidebar-label { font-size: 10px; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 10px; font-family: 'DM Mono', monospace; }
+
+  .quick-btn {
+    width: 100%; padding: 9px 14px; border-radius: 10px; border: none;
+    background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85);
+    font-size: 12px; font-family: 'DM Sans', sans-serif; text-align: left;
+    cursor: pointer; margin-bottom: 6px; transition: all 0.2s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .quick-btn:hover { background: rgba(255,255,255,0.14); color: #fff; transform: translateX(3px); }
+  .quick-btn .qicon { font-size: 14px; width: 20px; text-align: center; }
+
+  .intent-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .intent-tag {
+    font-size: 10px; padding: 3px 9px; border-radius: 20px;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);
+    font-family: 'DM Mono', monospace;
+    transition: all 0.2s;
+  }
+  .intent-tag.active { background: var(--accent); color: #fff; }
+
+  /* ── CHAT AREA ── */
+  .chat-area {
+    display: flex;
+    flex-direction: column;
+    background: var(--white);
+  }
+
+  .chat-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--white);
+  }
+  .chat-header-left { display: flex; align-items: center; gap: 12px; }
+  .header-avatar { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, #4f6ef7, #7c3aed); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .header-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .header-actions { display: flex; gap: 8px; }
+  .header-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .header-btn:hover { border-color: var(--accent); background: var(--accent-light); }
+
+  /* Messages */
+  .messages {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 14px;
+    scroll-behavior: smooth;
+  }
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .msg-row { display: flex; gap: 10px; align-items: flex-end; max-width: 80%; }
+  .msg-row.bot { align-self: flex-start; }
+  .msg-row.user { align-self: flex-end; flex-direction: row-reverse; }
+
+  .msg-avatar { width: 30px; height: 30px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .msg-avatar.bot { background: linear-gradient(135deg, #4f6ef7, #7c3aed); }
+  .msg-avatar.user { background: #e8edff; font-size: 12px; }
+
+  .bubble {
+    padding: 11px 16px; border-radius: 16px; font-size: 14px; line-height: 1.6;
+    animation: bubbleIn 0.25s ease;
+  }
+  @keyframes bubbleIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .bubble.bot { background: var(--bot-bubble); border: 1px solid var(--border); color: var(--text); border-bottom-left-radius: 4px; box-shadow: 0 1px 6px rgba(0,0,0,0.05); }
+  .bubble.user { background: var(--user-bubble); color: #fff; border-bottom-right-radius: 4px; }
+  .bubble strong { font-weight: 600; }
+  .bubble .code { font-family: 'DM Mono', monospace; font-size: 12px; background: rgba(79,110,247,0.08); padding: 1px 6px; border-radius: 4px; }
+
+  .msg-time { font-size: 10px; color: var(--muted); margin-top: 3px; padding: 0 4px; }
+  .msg-col { display: flex; flex-direction: column; }
+
+  /* Typing indicator */
+  .typing { display: flex; gap: 4px; align-items: center; padding: 12px 16px; }
+  .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: typingDot 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingDot { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+  /* Suggestions */
+  .suggestions { padding: 10px 24px 8px; display: flex; gap: 7px; flex-wrap: wrap; border-top: 1px solid var(--border); background: var(--surface); }
+  .suggest-chip {
+    font-size: 12px; padding: 5px 13px; border-radius: 20px; cursor: pointer;
+    background: var(--white); border: 1px solid var(--border); color: var(--muted);
+    transition: all 0.18s; white-space: nowrap; font-family: 'DM Sans', sans-serif;
+  }
+  .suggest-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+  /* Input */
+  .input-bar {
+    padding: 14px 20px;
+    display: flex; gap: 10px; align-items: center;
+    border-top: 1px solid var(--border); background: var(--white);
+  }
+  .chat-input {
+    flex: 1; padding: 11px 16px; border-radius: 12px; border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 14px;
+    font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.2s;
+    resize: none; height: 44px; line-height: 1.4;
+  }
+  .chat-input:focus { border-color: var(--accent); background: var(--white); }
+  .chat-input::placeholder { color: var(--muted); }
+  .send-btn {
+    width: 44px; height: 44px; border-radius: 12px; border: none; cursor: pointer;
+    background: var(--accent); color: #fff; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; flex-shrink: 0;
+  }
+  .send-btn:hover { background: #3a5ae8; transform: scale(1.05); }
+  .send-btn:active { transform: scale(0.97); }
+
+  /* Intent badge */
+  .intent-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    padding: 2px 8px; border-radius: 20px; margin-top: 5px;
+    background: var(--accent-light); color: var(--accent);
+  }
+
+  /* Escalation banner */
+  .escalation-banner {
+    background: #fff7ed; border: 1px solid #fed7aa;
+    border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #92400e;
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+
+  @media (max-width: 680px) {
+    .shell { grid-template-columns: 1fr; height: 100vh; border-radius: 0; }
+    .sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ── SIDEBAR ── -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="bot-avatar">🤖</div>
+      <div class="bot-name">ShopBot</div>
+      <div class="bot-status"><div class="status-dot"></div> Online · Ready to help</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">QUICK ACTIONS</div>
+      <button class="quick-btn" onclick="sendQuick('Track my order')"><span class="qicon">📦</span> Track My Order</button>
+      <button class="quick-btn" onclick="sendQuick('I want to return an item')"><span class="qicon">↩️</span> Return & Refund</button>
+      <button class="quick-btn" onclick="sendQuick('What payment methods do you accept?')"><span class="qicon">💳</span> Payment Options</button>
+      <button class="quick-btn" onclick="sendQuick('How long does shipping take?')"><span class="qicon">🚚</span> Shipping Info</button>
+      <button class="quick-btn" onclick="sendQuick('Do you have discount codes?')"><span class="qicon">🎟️</span> Discount Codes</button>
+      <button class="quick-btn" onclick="sendQuick('I want to speak to a human agent')"><span class="qicon">🙋</span> Human Agent</button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">DETECTED INTENT</div>
+      <div class="intent-tags" id="intentTags">
+        <span class="intent-tag">greeting</span>
+        <span class="intent-tag">order_status</span>
+        <span class="intent-tag">returns</span>
+        <span class="intent-tag">payment</span>
+        <span class="intent-tag">shipping</span>
+        <span class="intent-tag">discount</span>
+        <span class="intent-tag">account</span>
+        <span class="intent-tag">human</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:auto">
+      <div class="sidebar-label">NLP ENGINE</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.7;font-family:'DM Mono',monospace">
+        Rule-Based + Keyword Matching<br>
+        Intent Detection<br>
+        Entity Extraction<br>
+        Context Tracking<br>
+        Sentiment Escalation
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CHAT ── -->
+  <div class="chat-area">
+    <div class="chat-header">
+      <div class="chat-header-left">
+        <div class="header-avatar">🤖</div>
+        <div>
+          <div class="header-title">ShopBot Support</div>
+          <div class="header-sub">Typically replies instantly</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="header-btn" onclick="clearChat()" title="Clear chat">🗑️</button>
+      </div>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="suggestions" id="suggestions">
+      <span class="suggest-chip" onclick="sendQuick(this.textContent)">Track order</span>
+      <span class="suggest-chip" onclick="sendQuick(this.textContent)">Return item</span>
+      <span class="suggest-chip" onclick="sendQuick(this.textContent)">Shipping info</span>
+      <span class="suggest-chip" onclick="sendQuick(this.textContent)">Discount codes</span>
+      <span class="suggest-chip" onclick="sendQuick(this.textContent)">Cancel order</span>
+    </div>
+
+    <div class="input-bar">
+      <input class="chat-input" id="chatInput" type="text" placeholder="Type your message… (e.g. 'track my order')" autocomplete="off"/>
+      <button class="send-btn" onclick="handleSend()">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── NLP ENGINE ─────────────────────────────────────────────────────────── -->
+<script>
+const INTENTS = {
+  greeting:      { kw:["hello","hi","hey","good morning","good afternoon","howdy","greetings"], label:"greeting" },
+  farewell:      { kw:["bye","goodbye","see you","take care","done","exit"], label:"farewell" },
+  order_status:  { kw:["order","track","tracking","where is","status","shipped","delivery","package","parcel","dispatched","arrival"], label:"order_status" },
+  return_refund: { kw:["return","refund","exchange","send back","money back","replace","broken","damaged","wrong item","not working","defective"], label:"return_refund" },
+  payment:       { kw:["pay","payment","charge","bill","invoice","price","cost","credit card","debit","paypal","upi","wallet","transaction","receipt"], label:"payment" },
+  cancel_order:  { kw:["cancel","cancellation","stop order","abort"], label:"cancel_order" },
+  account:       { kw:["account","login","password","sign in","register","username","email","profile","reset","forgot","locked"], label:"account" },
+  product_info:  { kw:["product","item","available","stock","specification","feature","size","color","variant","compatible"], label:"product_info" },
+  shipping_info: { kw:["shipping","ship","free shipping","delivery time","how long","how fast","express","standard","overnight","international"], label:"shipping_info" },
+  discount:      { kw:["discount","coupon","promo","code","offer","deal","sale","voucher","cashback","savings"], label:"discount" },
+  human_agent:   { kw:["human","agent","person","representative","speak","talk","real person","support team","escalate","complaint"], label:"human_agent" },
+  thanks:        { kw:["thank","thanks","thank you","appreciate","helpful","great help","awesome"], label:"thanks" },
+};
+
+const RESPONSES = {
+  greeting:      ["Hello! 👋 Welcome to ShopBot Support. How can I help you today?", "Hi there! I'm here to help. What can I assist you with?", "Hey! Great to see you. How can I help?"],
+  farewell:      ["Goodbye! Have a wonderful day! 😊", "Thanks for reaching out. Take care!", "See you next time! Don't hesitate to come back."],
+  order_status:  ["I can help track your order! Please share your <strong>order ID</strong> (e.g. ORD-12345) and I'll look it up.", "To check your order status, I'll need your <strong>order number</strong> — it starts with 'ORD-' and is in your confirmation email."],
+  return_refund: ["I'm sorry to hear that! Our return policy allows returns within <strong>30 days</strong> of purchase. Would you like to start a return? Share your order ID.", "No worries — returns are easy within 30 days in original condition. Do you have your order number handy?"],
+  payment:       ["We accept <strong>Credit/Debit Cards, PayPal, UPI, and Net Banking</strong>. Is there a specific payment issue I can help with?", "For payment queries — we support Visa, Mastercard, PayPal, and UPI. If you were charged incorrectly, please share your order ID."],
+  cancel_order:  ["Orders can be cancelled within <strong>1 hour</strong> of placing them. Could you share your order ID so I can check eligibility?", "I can help cancel your order! Cancellations are only possible before the order ships. What's your order number?"],
+  account:       ["For account issues — are you having trouble <strong>logging in</strong>, or do you need to <strong>reset your password</strong>?", "Account support! Is this about a login issue, updating your email, or something else?"],
+  product_info:  ["Happy to help with product info! Could you tell me which product you're asking about?", "Sure! What product would you like to know more about? I can check availability, specs, and more."],
+  shipping_info: ["📬 <strong>Shipping Options:</strong><br>• Standard (5–7 days) — Free on orders over ₹500<br>• Express (2–3 days) — ₹99<br>• Overnight (1 day) — ₹199<br><br>International shipping available to 50+ countries."],
+  discount:      ["🎉 Current offers:<br>• <strong>FIRST10</strong> — 10% off your first order<br>• <strong>SAVE20</strong> — ₹200 off on orders above ₹1000<br>• <strong>FREESHIP</strong> — Free express shipping<br><br>Apply at checkout!"],
+  human_agent:   ["I'll connect you with a human agent! 🙋 Our team is available <strong>Mon–Sat, 9AM–6PM IST</strong>.<br>📧 support@shopbot.com<br>📞 1800-123-4567"],
+  thanks:        ["You're welcome! 😊 Is there anything else I can help you with?", "Happy to help! Let me know if you have more questions.", "Glad I could assist! Anything else?"],
+  fallback:      ["I'm not sure I understood that. Could you rephrase? I can help with <strong>orders, returns, payments, shipping</strong>, and more.", "Hmm, I didn't catch that. Try asking about your order, return policy, or payment options.", "I'm still learning! For complex issues, type <strong>'human agent'</strong>. Otherwise, could you clarify?"],
+};
+
+const FOLLOWUPS = {
+  order_status: { pattern: /ORD-?\d{4,6}/i, response: (id) => `📦 Order <strong>${id.toUpperCase()}</strong> is currently <strong>In Transit</strong> — estimated delivery in 2–3 business days. You'll get an email when it's out for delivery!` },
+  cancel_order: { pattern: /ORD-?\d{4,6}/i, response: (id) => `✅ I've initiated the cancellation request for order <strong>${id.toUpperCase()}</strong>. You'll receive a confirmation email within 15 minutes and a full refund in 3–5 business days.` },
+  return_refund:{ pattern: /ORD-?\d{4,6}/i, response: (id) => `↩️ Return initiated for order <strong>${id.toUpperCase()}</strong>! A return label has been sent to your registered email. Drop the package at any courier partner within 7 days.` },
+};
+
+const NEGATIVE_WORDS = ["angry","furious","terrible","worst","awful","useless","pathetic","hate","disgusting","unacceptable","fraud","scam","cheat","horrible","disgusted"];
+
+const SUGGESTIONS_MAP = {
+  order_status:  ["My order ID is ORD-12345","Track another order","Cancel order"],
+  return_refund: ["My order ID is ORD-12345","Refund status","Exchange item"],
+  payment:       ["Payment failed","Request invoice","Update card"],
+  shipping_info: ["Express delivery available?","International shipping?","Free shipping threshold"],
+  discount:      ["Apply FIRST10","Any other offers?","Refer a friend?"],
+  fallback:      ["Track order","Return item","Speak to agent","Shipping info"],
+};
+
+let context = { lastIntent: null };
+
+function detectIntent(text) {
+  const lower = text.toLowerCase();
+  let best = "fallback", bestScore = 0;
+  for (const [intent, data] of Object.entries(INTENTS)) {
+    const score = data.kw.filter(k => lower.includes(k)).length;
+    if (score > bestScore) { best = intent; bestScore = score; }
+  }
+  return best;
+}
+
+function extractOrderId(text) {
+  const m = text.match(/ORD-?\d{4,6}/i);
+  return m ? m[0] : null;
+}
+
+function isNegative(text) {
+  const lower = text.toLowerCase();
+  return NEGATIVE_WORDS.some(w => lower.includes(w));
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function getBotReply(text) {
+  if (isNegative(text)) {
+    return {
+      text: "I'm really sorry you're having a frustrating experience. 😔 Let me escalate this to a senior agent right away.<br><br>📧 <strong>support@shopbot.com</strong><br>📞 <strong>1800-123-4567</strong> (Mon–Sat, 9AM–6PM IST)",
+      intent: "escalation"
+    };
+  }
+
+  const orderId = extractOrderId(text);
+  if (orderId && context.lastIntent && FOLLOWUPS[context.lastIntent]) {
+    const reply = FOLLOWUPS[context.lastIntent].response(orderId);
+    const intent = context.lastIntent;
+    context.lastIntent = null;
+    return { text: reply, intent };
+  }
+
+  const intent = detectIntent(text);
+  const responses = RESPONSES[intent] || RESPONSES.fallback;
+  context.lastIntent = intent;
+  return { text: pick(responses), intent };
+}
+
+// ── UI ────────────────────────────────────────────────────────────────────
+const messagesEl = document.getElementById("messages");
+const inputEl = document.getElementById("chatInput");
+
+function now() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function addMessage(text, sender, intent) {
+  const row = document.createElement("div");
+  row.className = `msg-row ${sender}`;
+  const avatar = document.createElement("div");
+  avatar.className = `msg-avatar ${sender}`;
+  avatar.textContent = sender === "bot" ? "🤖" : "👤";
+  const col = document.createElement("div");
+  col.className = "msg-col";
+  const bubble = document.createElement("div");
+  bubble.className = `bubble ${sender}`;
+  bubble.innerHTML = text;
+  const time = document.createElement("div");
+  time.className = "msg-time";
+  time.style.textAlign = sender === "user" ? "right" : "left";
+  time.textContent = now();
+  col.appendChild(bubble);
+  if (intent && sender === "bot") {
+    const badge = document.createElement("div");
+    badge.className = "intent-badge";
+    badge.innerHTML = `🎯 ${intent.replace("_", " ")}`;
+    col.appendChild(badge);
+    highlightIntent(intent);
+  }
+  col.appendChild(time);
+  row.appendChild(avatar);
+  row.appendChild(col);
+  messagesEl.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function showTyping() {
+  const row = document.createElement("div");
+  row.className = "msg-row bot";
+  row.id = "typing-indicator";
+  row.innerHTML = `<div class="msg-avatar bot">🤖</div><div class="bubble bot"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  messagesEl.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById("typing-indicator");
+  if (el) el.remove();
+}
+
+function highlightIntent(intent) {
+  document.querySelectorAll(".intent-tag").forEach(t => {
+    t.classList.remove("active");
+    if (t.textContent.replace(" ","_") === intent || intent.includes(t.textContent)) {
+      t.classList.add("active");
+    }
+  });
+}
+
+function updateSuggestions(intent) {
+  const chips = SUGGESTIONS_MAP[intent] || SUGGESTIONS_MAP.fallback;
+  const el = document.getElementById("suggestions");
+  el.innerHTML = chips.map(c => `<span class="suggest-chip" onclick="sendQuick('${c}')">${c}</span>`).join("");
+}
+
+function handleSend() {
+  const text = inputEl.value.trim();
+  if (!text) return;
+  inputEl.value = "";
+  addMessage(text, "user");
+  showTyping();
+  setTimeout(() => {
+    removeTyping();
+    const { text: reply, intent } = getBotReply(text);
+    addMessage(reply, "bot", intent);
+    updateSuggestions(intent);
+  }, 700 + Math.random() * 400);
+}
+
+function sendQuick(text) {
+  inputEl.value = text;
+  handleSend();
+}
+
+function clearChat() {
+  messagesEl.innerHTML = "";
+  context = { lastIntent: null };
+  document.querySelectorAll(".intent-tag").forEach(t => t.classList.remove("active"));
+  setTimeout(() => {
+    addMessage("Chat cleared! 🧹 How can I help you today?", "bot", "greeting");
+  }, 200);
+}
+
+inputEl.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+
+// ── Init ──
+window.addEventListener("load", () => {
+  setTimeout(() => addMessage("Hello! 👋 Welcome to <strong>ShopBot Support</strong>. I'm here to help with orders, returns, payments, and more. How can I assist you today?", "bot", "greeting"), 400);
+});
+</script>
+</body>
+</html>
